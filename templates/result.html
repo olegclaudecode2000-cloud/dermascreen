@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Результат — ДермаСкрин</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <div class="container">
+    <header class="hero small">
+      <div class="logo">🤖 ДермаСкрин</div>
+      <h1>Результат первичной оценки</h1>
+    </header>
+
+    <main class="card result-card">
+      <div class="result-top">
+        <img class="thumb" src="{{ thumb }}" alt="Загруженное фото">
+        <div class="badge badge-{{ color }}">
+          {{ label }}
+        </div>
+      </div>
+
+      <div class="probabilities">
+        <div class="prob-row">
+          <span>Риск-скор (0–100, выше = подозрительнее)</span>
+          <strong>{{ score }} %</strong>
+        </div>
+        <div class="bar">
+          <div class="bar-fill bar-{{ color }}" style="width: {{ score }}%"></div>
+        </div>
+        <div class="prob-row muted">
+          <span>Сравнение с эталонным набором дерматоскопических снимков</span>
+        </div>
+      </div>
+
+      <div class="recommendation">
+        <h3>Рекомендация</h3>
+        <p>{{ recommendation }}</p>
+      </div>
+
+      <div class="abcde">
+        <h3>📋 Памятка самопроверки ABCDE</h3>
+        <ul>
+          {% for letter, title, desc in abcde %}
+            <li><strong>{{ letter }}</strong> — {{ title }}: {{ desc }}.</li>
+          {% endfor %}
+        </ul>
+      </div>
+
+      <div class="disclaimer-box">
+        ⚠️ <strong>Дисклеймер.</strong> Это НЕ диагноз. Программа оценивает только
+        визуальное сходство и не заменяет консультацию врача-дерматолога. При любых
+        сомнениях обратитесь к специалисту.
+      </div>
+
+      <div class="actions">
+        <a class="btn-primary" href="/">🔁 Проверить другое фото</a>
+      </div>
+    </main>
+
+    <footer class="foot">
+      
+      Не является медицинским изделием
+    </footer>
+  </div>
+</body>
+</html>

@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ДермаСкрин — умный помощник</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <div class="container">
+    <header class="hero">
+      <div class="logo">🤖 ДермаСкрин</div>
+      <h1>Первичная оценка риска кожных новообразований</h1>
+      <p class="subtitle">
+        Загрузите фото родинки — получите оценку риска и памятку самопроверки ABCDE.
+      </p>
+      <div class="disclaimer-note">
+        ⚠️ Программа <strong>НЕ ставит диагноз</strong> и не заменяет врача-дерматолога.
+      </div>
+    </header>
+
+    <main class="card">
+      <h2>📸 Загрузите фото родинки</h2>
+
+      {% if error %}
+        <div class="error">{{ error }}</div>
+      {% endif %}
+
+      <form action="/predict" method="post" enctype="multipart/form-data">
+        <label class="dropzone" for="photo">
+          <span class="dz-icon">🖼</span>
+          <span class="dz-text">Нажмите, чтобы выбрать фото</span>
+          <input type="file" id="photo" name="photo" accept="image/*" required>
+        </label>
+
+        <ul class="tips">
+          <li>💡 Крупный план, родинка по центру кадра</li>
+          <li>💡 Равномерное освещение, без сильной вспышки</li>
+          <li>💡 Одна родинка на фото, без посторонних объектов</li>
+        </ul>
+
+        <button type="submit" class="btn-primary">Анализировать</button>
+      </form>
+    </main>
+
+    <footer class="foot">
+      
+      Не является медицинским изделием
+    </footer>
+  </div>
+</body>
+</html>

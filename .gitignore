@@ -1,0 +1,21 @@
+# --- Окружение ---
+venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# --- Данные и модель (большие файлы, генерируются заново) ---
+data/
+model/
+*.keras
+*.h5
+
+# --- Генерируемые / вспомогательные ---
+eda_output/
+samples/
+demo/
+backup_original_site/
+
+# --- Системные ---
+.DS_Store
+Thumbs.db
