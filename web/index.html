@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ДермаСкрин — оценка риска кожных новообразований</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.20.0/dist/tf.min.js"></script>
+  <script src="ref_probs.js"></script>
+</head>
+<body>
+  <div class="container">
+    <header class="hero">
+      <div class="logo">🤖 ДермаСкрин</div>
+      <h1>Первичная оценка риска кожных новообразований</h1>
+      <p class="subtitle">Загрузите фото родинки — получите оценку риска и памятку самопроверки ABCDE.</p>
+      <div class="disclaimer-note">⚠️ Программа <strong>НЕ ставит диагноз</strong> и не заменяет врача-дерматолога.</div>
+    </header>
+
+    <main class="card">
+      <h2>📸 Загрузите фото родинки</h2>
+      <p id="model-status" style="color:#6b7280; font-size:14px;">⏳ Загрузка модели…</p>
+
+      <label class="dropzone" for="photo">
+        <span class="dz-icon">🖼</span>
+        <span class="dz-text">Нажмите, чтобы выбрать фото</span>
+        <input type="file" id="photo" accept="image/*">
+      </label>
+
+      <ul class="tips">
+        <li>💡 Крупный план, родинка по центру кадра</li>
+        <li>💡 Равномерное освещение, без сильной вспышки</li>
+      </ul>
+
+      <div id="result" style="display:none;">
+        <div class="result-top">
+          <img id="thumb" class="thumb" alt="Фото">
+          <div id="badge" class="badge badge-green">…</div>
+        </div>
+        <div class="probabilities">
+          <div class="prob-row">
+            <span>Риск-скор (0–100, выше = подозрительнее)</span>
+            <strong id="score">0 %</strong>
+          </div>
+          <div class="bar">
+            <div id="bar-fill" class="bar-fill bar-green" style="width:0%"></div>
+          </div>
+        </div>
+        <div class="recommendation">
+          <h3>Рекомендация</h3>
+          <p id="rec"></p>
+        </div>
+        <div class="abcde">
+          <h3>📋 Памятка самопроверки ABCDE</h3>
+          <ul id="abcde-list"></ul>
+        </div>
+        <div class="disclaimer-box">
+          ⚠️ <strong>Дисклеймер.</strong> Это НЕ диагноз. Программа оценивает только
+          визуальное сходство и не заменяет консультацию врача-дерматолога.
+        </div>
+        <div class="actions">
+          <button class="btn-primary" id="again">🔁 Проверить другое фото</button>
+        </div>
+      </div>
+    </main>
+
+    <footer class="foot">Не является медицинским изделием</footer>
+  </div>
+
+  <script>
+    const MODEL_PATH = 'model_tfjs/model.json';
+    const IMG_SIZE = 224;
+
+    const ABCDE = [
+      ['A', 'Asymmetry — асимметрия', 'половинки родинки несимметричны'],
+      ['B', 'Border — края', 'края неровные, «рваные», нечёткие'],
+      ['C', 'Color — цвет', 'цвет неоднородный, несколько оттенков'],
+      ['D', 'Diameter — диаметр', 'диаметр больше 6 мм'],
+      ['E', 'Evolution — изменения', 'родинка меняет форму, цвет или размер'],
+    ];
+
+    const REC = {
+      low: 'Выраженных признаков опасного образования не обнаружено. Рекомендуется обычное наблюдение и самопроверка по правилу ABCDE.',
+      medium: 'Пограничный случай. Рекомендуется показать образование дерматологу в ближайшее время.',
+      high: 'Высокая визуальная схожесть с опасным образованием. Настоятельно рекомендуется записаться к дерматологу без промедления.',
+    };
+
+    let model = null;
+
+    // --- загрузка модели ---
+    async function loadModel() {
+      const s = document.getElementById('model-status');
+      try {
+        model = await tf.loadLayersModel(MODEL_PATH);
+        s.textContent = '✅ Модель готова — можно загружать фото';
+      } catch (e) {
+        s.textContent = 'Ошибка загрузки модели: ' + e;
+      }
+    }
+
+    // --- предобработка (повторяет Python: /255, затем /127.5 - 1) ---
+    function preprocess(img) {
+      return tf.tidy(() =>
+        tf.browser.fromPixels(img)
+          .resizeBilinear([IMG_SIZE, IMG_SIZE])
+          .toFloat()
+          .div(255)
+          .div(127.5)
+          .sub(1)
+          .expandDims(0)
+      );
+    }
+
+    // --- риск-скор = процентильный ранг вероятности ---
+    function riskScore(p) {
+      let n = 0;
+      for (let i = 0; i < REF_PROBS.length; i++) {
+        if (REF_PROBS[i] <= p) n++;
+      }
+      return (n / REF_PROBS.length) * 100;
+    }
+
+    function zoneOf(score) {
+      if (score < 40) return ['low', 'green', 'Низкий риск'];
+      if (score < 70) return ['medium', 'yellow', 'Средний риск (пограничная зона)'];
+      return ['high', 'red', 'Высокий риск'];
+    }
+
+    // --- обработка выбранного фото ---
+    async function handleFile(file) {
+      if (!model) {
+        alert('Модель ещё загружается, подождите секунду.');
+        return;
+      }
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.src = url;
+      await new Promise((res) => (img.onload = res));
+
+      // показать превью и скрыть старый результат
+      document.getElementById('result').style.display = 'none';
+
+      try {
+        const prob = await tf.tidy(() => {
+          const input = preprocess(img);
+          const out = model.predict(input);
+          return out.dataSync()[0];
+        });
+
+        const score = Math.round(riskScore(prob) * 10) / 10;
+        const [zone, color, label] = zoneOf(score);
+
+        document.getElementById('thumb').src = url;
+        document.getElementById('badge').className = 'badge badge-' + color;
+        document.getElementById('badge').textContent = label;
+        document.getElementById('score').textContent = score + ' %';
+        document.getElementById('bar-fill').className = 'bar-fill bar-' + color;
+        document.getElementById('bar-fill').style.width = Math.min(score, 100) + '%';
+        document.getElementById('rec').textContent = REC[zone];
+
+        const list = document.getElementById('abcde-list');
+        list.innerHTML = '';
+        ABCDE.forEach(([L, T, D]) => {
+          const li = document.createElement('li');
+          li.innerHTML = '<strong>' + L + '</strong> — ' + T + ': ' + D + '.';
+          list.appendChild(li);
+        });
+
+        document.getElementById('result').style.display = 'block';
+      } catch (e) {
+        alert('Не удалось обработать фото: ' + e);
+      }
+    }
+
+    document.getElementById('photo').addEventListener('change', (ev) => {
+      if (ev.target.files.length) handleFile(ev.target.files[0]);
+    });
+
+    document.getElementById('again').addEventListener('click', () => {
+      document.getElementById('result').style.display = 'none';
+      document.getElementById('photo').value = '';
+    });
+
+    loadModel();
+  </script>
+</body>
+</html>
