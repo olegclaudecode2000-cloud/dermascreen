@@ -98,7 +98,7 @@
       statusEl.className = 'model-status loading';
       statusEl.innerHTML = '<span class="spinner"></span> Загрузка модели… (около 10 МБ, подождите несколько секунд)';
       try {
-        model = await tf.loadLayersModel(MODEL_PATH);
+        model = await tf.loadGraphModel(MODEL_PATH);
         statusEl.className = 'model-status ready';
         statusEl.innerHTML = '✅ Модель готова — нажмите ниже и выберите фото';
         dropzoneEl.classList.remove('disabled');
