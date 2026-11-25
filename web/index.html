@@ -19,12 +19,15 @@
 
     <main class="card">
       <h2>📸 Загрузите фото родинки</h2>
-      <p id="model-status" style="color:#6b7280; font-size:14px;">⏳ Загрузка модели…</p>
 
-      <label class="dropzone" for="photo">
+      <div id="model-status" class="model-status loading">
+        <span class="spinner"></span> Загрузка модели… (около 10 МБ, подождите несколько секунд)
+      </div>
+
+      <label class="dropzone disabled" id="dropzone" for="photo">
         <span class="dz-icon">🖼</span>
         <span class="dz-text">Нажмите, чтобы выбрать фото</span>
-        <input type="file" id="photo" accept="image/*">
+        <input type="file" id="photo" accept="image/*" disabled>
       </label>
 
       <ul class="tips">
@@ -86,15 +89,26 @@
     };
 
     let model = null;
+    const statusEl = document.getElementById('model-status');
+    const dropzoneEl = document.getElementById('dropzone');
+    const inputEl = document.getElementById('photo');
 
     // --- загрузка модели ---
     async function loadModel() {
-      const s = document.getElementById('model-status');
+      statusEl.className = 'model-status loading';
+      statusEl.innerHTML = '<span class="spinner"></span> Загрузка модели… (около 10 МБ, подождите несколько секунд)';
       try {
         model = await tf.loadLayersModel(MODEL_PATH);
-        s.textContent = '✅ Модель готова — можно загружать фото';
+        statusEl.className = 'model-status ready';
+        statusEl.innerHTML = '✅ Модель готова — нажмите ниже и выберите фото';
+        dropzoneEl.classList.remove('disabled');
+        inputEl.disabled = false;
       } catch (e) {
-        s.textContent = 'Ошибка загрузки модели: ' + e;
+        model = null;
+        statusEl.className = 'model-status error';
+        statusEl.innerHTML = '❌ Не удалось загрузить модель. Проверьте интернет и <button id="retry" class="retry">нажмите, чтобы повторить</button>.';
+        const btn = document.getElementById('retry');
+        if (btn) btn.addEventListener('click', loadModel);
       }
     }
 
@@ -128,16 +142,13 @@
 
     // --- обработка выбранного фото ---
     async function handleFile(file) {
-      if (!model) {
-        alert('Модель ещё загружается, подождите секунду.');
-        return;
-      }
+      if (!model) return; // кнопка и так заблокирована, пока модель не готова
+
       const img = new Image();
       const url = URL.createObjectURL(file);
       img.src = url;
       await new Promise((res) => (img.onload = res));
 
-      // показать превью и скрыть старый результат
       document.getElementById('result').style.display = 'none';
 
       try {
@@ -172,13 +183,13 @@
       }
     }
 
-    document.getElementById('photo').addEventListener('change', (ev) => {
+    inputEl.addEventListener('change', (ev) => {
       if (ev.target.files.length) handleFile(ev.target.files[0]);
     });
 
     document.getElementById('again').addEventListener('click', () => {
       document.getElementById('result').style.display = 'none';
-      document.getElementById('photo').value = '';
+      inputEl.value = '';
     });
 
     loadModel();
